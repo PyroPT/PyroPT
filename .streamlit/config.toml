@@ -1,0 +1,32 @@
+[server]
+enableStaticServing = true
+
+[[theme.fontFaces]]
+family = "Montserrat"
+url = "app/static/Montserrat-VariableFont_wght.ttf"
+
+[theme]
+primaryColor = "rgb(115, 47, 109)"
+backgroundColor = "#FCFCFA"
+secondaryBackgroundColor = "#ecebe3"
+textColor = "#3d3a2a"
+linkColor = "rgb(115, 47, 109)"
+borderColor = "#d3d2ca"
+showWidgetBorder = true
+baseRadius = "0.75rem"
+buttonRadius = "full"
+font = "Montserrat"
+headingFontWeights = [600,500,500,500,500,500]
+headingFontSizes = ["2rem", "1.5rem"]
+codeFont = "monospace"
+codeFontSize = ".75rem"
+codeBackgroundColor = "#ecebe4"
+showSidebarBorder = true
+chartCategoricalColors = ["#0ea5e9", "#059669", "#fbbf24"]
+
+[theme.sidebar]
+backgroundColor = "#EBD9E7"
+secondaryBackgroundColor = "#ecebe3"
+codeBackgroundColor = "#D7D4D0"
+headingFontSizes = ["1.6rem", "1.4rem", "1.2rem"]
+dataframeHeaderBackgroundColor = "#e4e4e0"
