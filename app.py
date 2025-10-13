@@ -915,9 +915,9 @@ def run_app() -> None:
 
     def render_footer() -> None:
         st.markdown("---")
-        st.html(
+        st.markdown(
             """
-            <div style="font-size:0.5rem;color:#555;">
+            <div style="font-size:0.75rem;color:#555;">
                 <p><small><strong>Data Privacy:</strong> If you are using this app via <a href="https://pyropt.streamlit.app">pyropt.streamlit.app</a>, note that uploaded .CSV files are processed on a <em>Streamlit Community Cloud</em> server. Your files/data are not saved or stored, and data transfered to this service is subject to strict and high standards. See <a href="https://docs.streamlit.io/deploy/streamlit-community-cloud/get-started/trust-and-security">Streamlit documentation</a> for more detail.
                 If you prefer to run this app on your own machine for greater data privacy, you can <a href="https://docs.streamlit.io/get-started/installation">install streamlit</a> on your computer, and download the code for this app from the <a href="https://github.com/PyroPT/PyroPT">PyroPT GitHub repository</a>.</small></p>
                 <p><small>This tool was developed from research funded by the European Union (<a href='https://cordis.europa.eu/project/id/101044276'>ERC-CoG-2020 LITHO3</a>, 101044276 to ELT).</small></p>
@@ -930,7 +930,8 @@ def run_app() -> None:
                 </small></p>
                 <p><small>Views and opinions expressed are however those of the authors only and do not necessarily reflect those of the European Union or the European Research Council. Neither the European Union nor the granting authority can be held responsible for them.</small></p>
             </div>
-            """
+            """,
+            unsafe_allow_html=True
         )
 
     with st.sidebar:
@@ -969,7 +970,7 @@ def run_app() -> None:
         )
         st.markdown("*Changing these settings alters your plot but does not re-compute the predictions.*")
         st.markdown("---")
-        st.markdown(":gray[PyroPT v.0.9.2 2025]")
+        st.markdown(":gray[PyroPT v.0.9.3 2025]")
 
     uploaded_file = st.file_uploader(
         "Upload a CSV file containing unknown garnet analyses", type="csv", accept_multiple_files=False
