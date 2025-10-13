@@ -59,7 +59,7 @@ OXIDE_CONFIG = pd.DataFrame([
 ], columns=['Oxide', 'MolecularWeight', 'Oxygens', 'Cations', 'CationCharge'])
 
 # Required oxides for Fe3+ calculations
-REQUIRED_OXIDES = ['SiO2', 'Al2O3', 'MgO', 'CaO', 'FeO', 'MnO', 'TiO2', 'Cr2O3', 'Na2O', 'K2O']
+REQUIRED_OXIDES = ['SiO2', 'Al2O3', 'MgO', 'CaO', 'FeO', 'MnO', 'TiO2', 'Cr2O3', 'Na2O']
 
 
 def dataframe_signature(df: pd.DataFrame) -> str:
@@ -464,7 +464,7 @@ def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame
     unknowns = pd.DataFrame(new_rows)
     
     # Calculate totals
-    oxides = ['SiO2', 'Al2O3', 'Cr2O3', 'TiO2', 'FeO', 'MnO', 'MgO', 'CaO', 'Na2O', 'K2O', 'Fe2O3']
+    oxides = ['SiO2', 'Al2O3', 'Cr2O3', 'TiO2', 'FeO', 'MnO', 'MgO', 'CaO', 'Na2O', 'Fe2O3']
     unknowns['Total'] = unknowns[oxides].sum(axis=1)
     
     # Initialize validation
@@ -918,13 +918,15 @@ def run_app() -> None:
         st.html(
             """
             <div style="font-size:0.5rem;color:#555;">
+                <p><small><strong>Data Privacy:</strong> If you are using this app via <a href="https://pyropt.streamlit.app">pyropt.streamlit.app</a>, note that uploaded .CSV files are processed on a <em>Streamlit Community Cloud</em> server. Your files/data are not saved or stored, and data transfered to this service is subject to strict and high standards. See <a href="https://docs.streamlit.io/deploy/streamlit-community-cloud/get-started/trust-and-security">Streamlit documentation</a> for more detail.
+                If you prefer to run this app on your own machine for greater data privacy, you can <a href="https://docs.streamlit.io/get-started/installation">install streamlit</a> on your computer, and download the code for this app from the <a href="https://github.com/PyroPT/PyroPT">PyroPT GitHub repository</a>.</small></p>
                 <p><small>This tool was developed from research funded by the European Union (<a href='https://cordis.europa.eu/project/id/101044276'>ERC-CoG-2020 LITHO3</a>, 101044276 to ELT).</small></p>
                 <p>Gary J. O'Sullivan<sup>1</sup>, Emma L. Tomlinson<sup>1</sup>, Dónal Mulligan<sup>2</sup>, Michele Rinaldi<sup>1</sup>, Oliver Higgins<sup>1,3</sup>, Phillip E. Janney<sup>4</sup>, Brendan C. Hoare<sup>5</sup></p>
                 <p><small> <sup>1</sup> Department of Geology, <a href='http://www.tcd.ie'>Trinity College Dublin</a>, Ireland<br/>
                     <sup>2</sup> School of Communications, <a href='http://www.dcu.ie'>Dublin City University</a>, Ireland<br/>
                     <sup>3</sup> <a href='https://www.st-andrews.ac.uk'>University of St Andrews</a>, United Kingdom<br/>
                     <sup>4</sup> <a href='https://www.uct.ac.za'>University of Cape Town</a>, South Africa<br/>
-                    <sup>5</sup> <a href='https://www.fsu.edu'>Florida State University</a>, United States of America
+                    <sup>5</sup> National High Magnetic Field Laboratory, <a href='https://www.fsu.edu'>Florida State University</a>, United States of America
                 </small></p>
                 <p><small>Views and opinions expressed are however those of the authors only and do not necessarily reflect those of the European Union or the European Research Council. Neither the European Union nor the granting authority can be held responsible for them.</small></p>
             </div>
@@ -967,17 +969,17 @@ def run_app() -> None:
         )
         st.markdown("*Changing these settings alters your plot but does not re-compute the predictions.*")
         st.markdown("---")
-        st.markdown(":gray[PyroPT v.0.9 2025]")
+        st.markdown(":gray[PyroPT v.0.9.2 2025]")
 
     uploaded_file = st.file_uploader(
         "Upload a CSV file containing unknown garnet analyses", type="csv", accept_multiple_files=False
     )
 
     if not uploaded_file:
-        st.info("Your **.CSV** file must have at least the following column headings:\n\n"
-        "`Sample_ID`, `SiO2`, `TiO2`, `Al2O3`, `Cr2O3`, `MnO`, `MgO`, `FeO`, `CaO`, `Na2O`, `K2O` \n\n"
-        "Empty values for cells are okay, data for `Na2O`, `K2O` etc. are not strictly required\n\n"
-        "It is okay to include additional columns in your file. These are ignored and do not affect the models.")
+        st.info('''Your **.CSV** file must have at least the following column headings (in any order):  
+        `Sample_ID`, `SiO2`, `TiO2`, `Al2O3`, `Cr2O3`, `MnO`, `MgO`, `FeO`, `CaO`, `Na2O`'''
+        '''\n\nEmpty values for cells are assumed to be zero, when your file is processed. Values for `Na2O` can always be empty, if no data. You can include additional columns in your file - *these are ignored and do not affect the models*.
+        ''')
         render_footer()
         return
 
@@ -1021,7 +1023,7 @@ def run_app() -> None:
 
         allowed_columns = [
             "Sample_ID", "SiO2", "Al2O3", "MgO", "CaO", "FeO", "MnO", "TiO2", "Cr2O3",
-            "Na2O", "K2O", "Fe2O3", "Mg#", "Garnet_type", "Total", "Valid",
+            "Na2O", "Fe2O3", "Mg#", "Garnet_type", "Total", "Valid",
             "Validation_Failures", "Ca_int", "Predicted_P", "Average_Distance", "Predicted_T"
         ]
 
@@ -1046,8 +1048,11 @@ def run_app() -> None:
         final_output = cached_result["final_output"]
         final_output_filtered = cached_result["final_output_filtered"]
 
-    st.success("Predictions complete.")
-    st.dataframe(final_output_filtered)
+    if 'Valid' in final_output_filtered.columns:
+        reordered_columns = ['Valid'] + [col for col in final_output_filtered.columns if col != 'Valid']
+        final_output_filtered = final_output_filtered[reordered_columns]
+        if data_signature in cache:
+            cache[data_signature]["final_output_filtered"] = final_output_filtered
 
     uploaded_stem = Path(uploaded_file.name).stem
     safe_input_name = re.sub(r'[^A-Za-z0-9]+', '_', uploaded_stem).strip('_').lower() or "input"
@@ -1056,12 +1061,51 @@ def run_app() -> None:
     pdf_download_name = f"PyroPT_plot_{safe_input_name}_{export_timestamp}.pdf"
 
     csv_bytes = final_output_filtered.to_csv(index=False).encode('utf-8')
+
+    valid_column = final_output_filtered.get('Valid')
+    if valid_column is not None:
+        valid_mask = valid_column.fillna(False)
+        valid_count = int(valid_mask.sum())
+        invalid_count = int(len(valid_column) - valid_count)
+    else:
+        valid_mask = None
+        valid_count = 0
+        invalid_count = 0
+
+    has_valid_rows = bool(valid_mask is not None and valid_mask.any())
+    has_predicted_pressure = (
+        'Predicted_P' in final_output_filtered.columns and final_output_filtered['Predicted_P'].notna().any()
+    )
+    has_predicted_temperature = (
+        'Predicted_T' in final_output_filtered.columns and final_output_filtered['Predicted_T'].notna().any()
+    )
+
+    has_predictions = has_valid_rows and (has_predicted_pressure or has_predicted_temperature)
+
+    if has_predictions:
+        success_msg = f"Predictions complete. {valid_count} valid row"
+        success_msg += "s." if valid_count != 1 else "."
+        if invalid_count:
+            invalid_label = "rows" if invalid_count != 1 else "row"
+            success_msg = success_msg.rstrip(".")
+            success_msg += f" and {invalid_count} invalid {invalid_label} - check validation failures field for details."
+        st.success(success_msg)
+    else:
+        st.error(
+            "No valid rows were identified in the uploaded file, so no pressure or temperature predictions "
+            "were generated. Please review the validation failures for each row."
+        )
+    st.dataframe(final_output_filtered)
     st.download_button(
         label="📄 Download predictions as CSV",
         data=csv_bytes,
         file_name=csv_download_name,
         mime="text/csv"
     )
+
+    if not has_predictions:
+        render_footer()
+        return
 
     anchor_weight = max(1.0, 20.0 / float(moho_uncertainty))
 
