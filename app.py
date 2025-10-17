@@ -20,8 +20,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import streamlit as st
 import re
+import csv
 from datetime import datetime
-from io import BytesIO
+from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor
@@ -36,12 +37,31 @@ class MissingRequiredColumnsError(Exception):
     """Raised when uploaded data is missing required oxide columns."""
     pass
 
+
+class InvalidOxideValueError(Exception):
+    """Raised when required oxide columns contain non-numeric, non-empty values."""
+    pass
+
+
+class UploadedFileTooLargeError(Exception):
+    """Raised when an uploaded file exceeds the configured size limit."""
+    pass
+
+
+class UploadedFileTooManyRowsError(Exception):
+    """Raised when an uploaded file exceeds the configured row-count limit."""
+    pass
+
+
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
 # =============================================================================
 # CONFIGURATION DATA
 # =============================================================================
+
+# Version numbering, to track updates
+PYROPT_VERSION = "v0.9.4 2025"
 
 # Mineral configuration for Fe3+ calculations
 MINERAL_CONFIG = pd.DataFrame([('Garnet', 'Garnet', 12, 8, 'yes', 0.014, 0.055)])
@@ -60,6 +80,9 @@ OXIDE_CONFIG = pd.DataFrame([
 
 # Required oxides for Fe3+ calculations
 REQUIRED_OXIDES = ['SiO2', 'Al2O3', 'MgO', 'CaO', 'FeO', 'MnO', 'TiO2', 'Cr2O3', 'Na2O']
+
+MAX_UPLOAD_BYTES = 1 * 1024 * 1024  # 1 MB upload limit
+MAX_UPLOAD_ROWS = 2_000  # Guard rail for extreme row counts
 
 
 def dataframe_signature(df: pd.DataFrame) -> str:
@@ -402,6 +425,67 @@ def train_and_evaluate_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
 # UNKNOWN SAMPLE PROCESSING
 # =============================================================================
 
+
+def count_csv_data_rows(uploaded_file: IO[bytes]) -> int:
+    """
+    Count non-empty data rows in an uploaded CSV without loading into memory.
+    
+    Args:
+        uploaded_file: Streamlit UploadedFile or file-like object positioned at the start.
+        
+    Returns:
+        Number of non-empty data rows (excluding header).
+    """
+    uploaded_file.seek(0)
+    text_wrapper = TextIOWrapper(uploaded_file, encoding='utf-8', newline='')
+    try:
+        reader = csv.reader(text_wrapper)
+        next(reader, None)  # Skip header row if present
+        data_rows = 0
+        for row in reader:
+            if not row:
+                continue
+            if any(cell.strip() for cell in row):
+                data_rows += 1
+        return data_rows
+    finally:
+        text_wrapper.detach()
+        uploaded_file.seek(0)
+
+
+def enforce_upload_limits(uploaded_file: IO[bytes],
+                          max_bytes: int = MAX_UPLOAD_BYTES,
+                          max_rows: int = MAX_UPLOAD_ROWS) -> None:
+    """
+    Ensure uploaded files fall within configured size and row limits.
+    
+    Args:
+        uploaded_file: Streamlit UploadedFile or file-like object.
+        max_bytes: Maximum allowed file size in bytes.
+        max_rows: Maximum allowed non-empty data rows.
+        
+    Raises:
+        UploadedFileTooLargeError: If the file exceeds size limits.
+        UploadedFileTooManyRowsError: If the CSV exceeds row limits.
+    """
+    file_size = getattr(uploaded_file, "size", None)
+    if isinstance(file_size, int) and max_bytes is not None and file_size > max_bytes:
+        raise UploadedFileTooLargeError(
+            "The uploaded file is too large. "
+            f"Maximum allowed size is {max_bytes / (1024 * 1024):.1f} MB."
+        )
+    
+    if max_rows is None:
+        return
+    
+    data_rows = count_csv_data_rows(uploaded_file)
+    if data_rows > max_rows:
+        raise UploadedFileTooManyRowsError(
+            f"The uploaded file contains {data_rows:,} data rows, exceeding the "
+            f"limit of {max_rows:,}. Please trim the file before uploading."
+        )
+
+
 def load_unknown_samples(file_source: Union[str, IO]) -> pd.DataFrame:
     """
     Load unknown samples from CSV file.
@@ -411,6 +495,9 @@ def load_unknown_samples(file_source: Union[str, IO]) -> pd.DataFrame:
         
     Returns:
         DataFrame with unknown samples
+    
+    Raises:
+        InvalidOxideValueError: If required oxide columns contain invalid values.
     """
     if hasattr(file_source, 'seek'):
         file_source.seek(0)
@@ -419,6 +506,49 @@ def load_unknown_samples(file_source: Union[str, IO]) -> pd.DataFrame:
     # Add 'Mineral' column if missing
     if 'Mineral' not in df.columns:
         df['Mineral'] = 'Garnet'
+    
+    def _normalize_value(value: object) -> object:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return np.nan if stripped == '' else stripped
+        return value
+    
+    for oxide in REQUIRED_OXIDES:
+        if oxide not in df.columns:
+            continue
+        raw_series = df[oxide]
+        normalized_series = raw_series.map(_normalize_value)
+        numeric_series = pd.to_numeric(normalized_series, errors='coerce')
+        invalid_mask = (~normalized_series.isna()) & numeric_series.isna()
+        if invalid_mask.any():
+            invalid_idx = invalid_mask[invalid_mask].index[0]
+            sample_label = (
+                df.at[invalid_idx, 'Sample_ID']
+                if ('Sample_ID' in df.columns and invalid_idx in df.index)
+                else invalid_idx
+            )
+            if isinstance(sample_label, str):
+                sample_label = sample_label.strip() or '[missing Sample_ID]'
+            elif pd.isna(sample_label):
+                sample_label = '[missing Sample_ID]'
+            else:
+                sample_label = str(sample_label)
+            try:
+                index_location = df.index.get_loc(invalid_idx)
+                if isinstance(index_location, slice):
+                    row_position = index_location.start or 0
+                elif isinstance(index_location, np.ndarray):
+                    row_position = int(index_location[0])
+                else:
+                    row_position = int(index_location)
+            except KeyError:
+                row_position = list(df.index).index(invalid_idx)
+            line_number = row_position + 2  # account for header row
+            raise InvalidOxideValueError(
+                "Oxide columns must either be a number or be blank.\n\n "
+                f"Sample {sample_label} on line {line_number} contains a problem value for {oxide}."
+            )
+        df[oxide] = numeric_series
     
     return df
 
@@ -920,7 +1050,7 @@ def run_app() -> None:
             <div style="font-size:0.75rem;color:#555;">
                 <p><small><strong>Data Privacy:</strong> If you are using this app via <a href="https://pyropt.streamlit.app">pyropt.streamlit.app</a>, note that uploaded .CSV files are processed on a <em>Streamlit Community Cloud</em> server. Your files/data are not saved or stored, and data transfered to this service is subject to strict and high standards. See <a href="https://docs.streamlit.io/deploy/streamlit-community-cloud/get-started/trust-and-security">Streamlit documentation</a> for more detail.
                 If you prefer to run this app on your own machine for greater data privacy, you can <a href="https://docs.streamlit.io/get-started/installation">install streamlit</a> on your computer, and download the code for this app from the <a href="https://github.com/PyroPT/PyroPT">PyroPT GitHub repository</a>.</small></p>
-                <p><small>This tool was developed from research funded by the European Union (<a href='https://cordis.europa.eu/project/id/101044276'>ERC-CoG-2020 LITHO3</a>, 101044276 to ELT).</small></p>
+                <p><small><strong>Attribution &amp; Acknowledgements:</strong> 
                 <p>Gary J. O'Sullivan<sup>1</sup>, Emma L. Tomlinson<sup>1</sup>, Dónal Mulligan<sup>2</sup>, Michele Rinaldi<sup>1</sup>, Oliver Higgins<sup>1,3</sup>, Phillip E. Janney<sup>4</sup>, Brendan C. Hoare<sup>5</sup></p>
                 <p><small> <sup>1</sup> Department of Geology, <a href='http://www.tcd.ie'>Trinity College Dublin</a>, Ireland<br/>
                     <sup>2</sup> School of Communications, <a href='http://www.dcu.ie'>Dublin City University</a>, Ireland<br/>
@@ -928,6 +1058,7 @@ def run_app() -> None:
                     <sup>4</sup> <a href='https://www.uct.ac.za'>University of Cape Town</a>, South Africa<br/>
                     <sup>5</sup> National High Magnetic Field Laboratory, <a href='https://www.fsu.edu'>Florida State University</a>, United States of America
                 </small></p>
+                <p>This tool was developed from a research project funded by the European Union (<a href='https://cordis.europa.eu/project/id/101044276'>ERC-CoG-2020 LITHO3</a>, 101044276 to ELT).</small></p>
                 <p><small>Views and opinions expressed are however those of the authors only and do not necessarily reflect those of the European Union or the European Research Council. Neither the European Union nor the granting authority can be held responsible for them.</small></p>
             </div>
             """,
@@ -949,10 +1080,26 @@ def run_app() -> None:
             help="Toggle fitting of the dashed geotherm line and LAB estimate"
         )
         moho_temperature = st.slider(
-            "Moho Temperature (°C)", min_value=400, max_value=700, value=int(MOHO_TEMPERATURE), step=10
+            "Moho Temperature (°C)", 
+            min_value=400, 
+            max_value=700, 
+            value=int(MOHO_TEMPERATURE), 
+            step=10,
+            help="Default value (480) is based on Moho Temperature range reported for Slave Craton, e.g. *Gruber et al. 2021*."
         )
         moho_pressure = st.slider(
-            "Moho Pressure (kbar)", min_value=5, max_value=20, value=int(MOHO_PRESSURE), step=1
+            "Moho Pressure (kbar)", 
+            min_value=5, 
+            max_value=20, 
+            value=int(MOHO_PRESSURE), 
+            step=1,
+            help="Default value (5) is based on a common cratonic average, see: *Youssof et al. 2013; Keller 2013*."
+        )
+        adiabat_temperature = st.slider(
+            "Mantle Adiabat Temperature (°C)", min_value=1250, max_value=1500,
+            value=int(ADIABAT_TEMPERATURE), 
+            step=10,
+            help="Default value (1300) is based on modern mantle potential temperature from *Katsura et al. 2010*."
         )
         moho_uncertainty = st.slider(
             "Qualitative Moho Uncertainty",
@@ -960,17 +1107,11 @@ def run_app() -> None:
             max_value=10,
             value=int(MOHO_UNCERTAINTY),
             step=1,
-            help="Affects the certainty with which the points are anchored to the Moho pressure and temperature. Lower values indicate increased certainty. Default is 5."
-        )
-        adiabat_temperature = st.slider(
-            "Mantle Adiabat Temperature (°C)", min_value=1250, max_value=1500,
-            value=int(ADIABAT_TEMPERATURE), 
-            step=10,
-            help="Mantle potential temperature"
+            help="Default value: 5. Affects the certainty with which the points are anchored to the Moho pressure and temperature. Lower values indicate increased certainty and vice versa."
         )
         st.markdown("*Changing these settings alters your plot but does not re-compute the predictions.*")
         st.markdown("---")
-        st.markdown(":gray[PyroPT v.0.9.3 2025]")
+        st.markdown(f":gray[PyroPT {PYROPT_VERSION}]")
 
     uploaded_file = st.file_uploader(
         "Upload a CSV file containing unknown garnet analyses", type="csv", accept_multiple_files=False
@@ -979,17 +1120,31 @@ def run_app() -> None:
     if not uploaded_file:
         st.info('''Your **.CSV** file must have at least the following column headings (in any order):  
         `Sample_ID`, `SiO2`, `TiO2`, `Al2O3`, `Cr2O3`, `MnO`, `MgO`, `FeO`, `CaO`, `Na2O`'''
-        '''\n\nEmpty values for cells are assumed to be zero, when your file is processed. Values for `Na2O` can always be empty, if no data. You can include additional columns in your file - *these are ignored and do not affect the models*.
+        '''\n\nEmpty values for cells are assumed to be zero, when your file is processed. Values for `Na2O` can always be empty, if no data. You can include additional columns in your file - *these are ignored and do not affect the models*.'''
+        '''\n\nA filesize limit of 1 MB applies. Your file is also limited to 2,000 rows.
         ''')
         render_footer()
         return
 
     try:
-        unknowns = load_unknown_samples(uploaded_file).fillna(0.000001)
+        enforce_upload_limits(uploaded_file)
+    except (UploadedFileTooLargeError, UploadedFileTooManyRowsError) as exc:
+        st.error(str(exc))
+        render_footer()
+        return
+
+    try:
+        unknowns = load_unknown_samples(uploaded_file)
+    except InvalidOxideValueError as exc:
+        st.error(str(exc))
+        render_footer()
+        return
     except Exception as exc:
         st.error(f"Could not read the uploaded CSV file: {exc}")
         render_footer()
         return
+
+    unknowns = unknowns.fillna(0.000001)
 
     st.success(f"Loaded {len(unknowns)} samples from `{uploaded_file.name}`.")
 
