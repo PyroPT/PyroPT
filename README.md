@@ -1,3 +1,4 @@
+![PyroPT logo](assets/icon_100x100.png)
 # PyroPT
 
 [![Version](https://img.shields.io/badge/version-1.0-purple.svg)](https://github.com/PyroPT/PyroPT)
