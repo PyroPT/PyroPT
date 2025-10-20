@@ -4,7 +4,6 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/streamlit-1.28%2B-red.svg)](https://streamlit.io/)
-[![DOI](https://img.shields.io/badge/DOI-10.1000%2Fxyz123-blue.svg)](https://doi.org/10.1000/xyz123)
 
 Developed by: Gary J O'Sullivan (gjosulli@tcd.ie) & Dónal Mulligan (donal.mulligan@dcu.ie).  
 To notify us of bugs or issues, please email using the subject line `PyroPT Issue Report`   
