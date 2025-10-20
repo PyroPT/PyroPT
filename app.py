@@ -53,6 +53,11 @@ class UploadedFileTooManyRowsError(Exception):
     pass
 
 
+class DuplicateSampleIDError(Exception):
+    """Raised when uploaded data contains duplicate Sample_ID values."""
+    pass
+
+
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
@@ -61,7 +66,7 @@ warnings.filterwarnings('ignore')
 # =============================================================================
 
 # Version numbering, to track updates
-PYROPT_VERSION = "v0.9.4 2025"
+PYROPT_VERSION = "v0.9.6 2025"
 
 # Mineral configuration for Fe3+ calculations
 MINERAL_CONFIG = pd.DataFrame([('Garnet', 'Garnet', 12, 8, 'yes', 0.014, 0.055)])
@@ -575,6 +580,26 @@ def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame
             "Your file must include the following columns: "
             f"{', '.join(sorted(REQUIRED_OXIDES))}. "
             f"Missing: {', '.join(missing_columns)}."
+        )
+    
+    if 'Sample_ID' not in unknowns.columns:
+        raise MissingRequiredColumnsError(
+            "Your file must include a `Sample_ID` column with unique values."
+        )
+
+    original_sample_ids = unknowns['Sample_ID']
+    normalized_sample_ids = original_sample_ids.astype(str).str.strip()
+    normalized_sample_ids = normalized_sample_ids.where(~original_sample_ids.isna(), np.nan)
+    duplicate_mask = normalized_sample_ids.duplicated(keep=False)
+    if duplicate_mask.any():
+        duplicate_values = normalized_sample_ids[duplicate_mask]
+        duplicate_value = duplicate_values.dropna().iloc[0] if not duplicate_values.dropna().empty else ''
+        duplicate_display = duplicate_value if duplicate_value else '[blank Sample_ID]'
+        raise DuplicateSampleIDError(
+            (
+                "Sample_ID values must be unique for each row in your input file. "
+                f"{duplicate_display} is duplicated."
+            )
         )
     
     old_unknowns = unknowns.copy()
@@ -1169,7 +1194,7 @@ def run_app() -> None:
                 output_t = predict_unknown_samples(
                     unknowns.copy(), 'T', training_df, FEATURES_P, FEATURES_T, DEFAULT_RANDOM_STATE_T
                 )
-        except MissingRequiredColumnsError as exc:
+        except (MissingRequiredColumnsError, DuplicateSampleIDError) as exc:
             st.error(str(exc))
             render_footer()
             return
@@ -1278,7 +1303,19 @@ def run_app() -> None:
 
     _, plot_col, _ = st.columns([1, 2.5, 1])
     with plot_col:
-        st.pyplot(fig, use_container_width=False)
+        pyplot_kwargs: Dict[str, Union[int, None]] = {}
+        if fig is not None and hasattr(fig, "get_size_inches"):
+            width_inches = fig.get_size_inches()[0]
+            dpi = fig.get_dpi()
+            if width_inches and dpi:
+                plotted_width = int(round(width_inches * dpi))
+                if plotted_width > 0:
+                    pyplot_kwargs["width"] = plotted_width
+        try:
+            st.pyplot(fig, **pyplot_kwargs)
+        except TypeError:
+            # For compatibility with older Streamlit versions that do not yet accept `width`
+            st.pyplot(fig)
         st.download_button(
             label="⬇️ Download plot as PDF",
             data=plot_pdf,
