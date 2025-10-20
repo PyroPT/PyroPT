@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "To reference your use of this software, please cite it as below."
+title: "PyroPT: Garnet Pressure–Temperature Predictor"
+type: software
+authors:
+  - family-names: "Mulligan"
+    given-names: "Dónal"
+    orcid: "https://orcid.org/0000-0001-5265-8734"
+  - family-names: "O'Sullivan"
+    given-names: "Gary John"
+    orcid: "https://orcid.org/0000-0003-4493-5433"
+version: "1.0.0"
+repository-code: "https://github.com/PyroPT/PyroPT"
+url: "https://pyropt.streamlit.app/"
+date-released: "2025-10-20"
+license: "Apache-2.0"
+repository-code: "https://github.com/PyroPT/PyroPT"
