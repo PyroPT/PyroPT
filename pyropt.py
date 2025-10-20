@@ -14,6 +14,8 @@ The code includes:
 - Visualization of results
 """
 
+import argparse
+import sys
 import pandas as pd
 import hashlib
 import numpy as np
@@ -66,7 +68,83 @@ warnings.filterwarnings('ignore')
 # =============================================================================
 
 # Version numbering, to track updates
-PYROPT_VERSION = "v0.9.6 2025"
+PYROPT_VERSION = "v1.0 2025"
+
+# Check flags to see if it's running locally, rather than on Streamlit Cloud
+def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """
+    Parse command line arguments for local execution.
+    
+    Args:
+        argv: Optional list of CLI arguments. When None, uses sys.argv[1:].
+        
+    Returns:
+        argparse.Namespace with recognised options. Unrecognised options are ignored
+        so that Streamlit-specific flags do not cause parsing to fail.
+    """
+    parser = argparse.ArgumentParser(
+        description="PyroPT Garnet P-T Predictor",
+        add_help=False
+    )
+    parser.add_argument(
+        "--max-upload-mb",
+        type=float,
+        default=None,
+        help="Maximum upload file size in MB. Overrides default cloud limit when provided."
+    )
+    parser.add_argument(
+        "--max-upload-rows",
+        type=int,
+        default=None,
+        help="Maximum number of rows in uploaded CSV. Overrides default cloud limit when provided."
+    )
+    parser.add_argument(
+        "--local_mode",
+        "--local-mode",
+        dest="local_mode",
+        action="store_true",
+        help="Enable local mode with relaxed default limits (10 MB, 20,000 rows)."
+    )
+    parsed, _ = parser.parse_known_args(argv)
+    return parsed
+
+
+CLI_ARGS = parse_arguments()
+
+# Default file size and csv row limits (for Streamlit Cloud)
+MAX_UPLOAD_BYTES = 1 * 1024 * 1024  # 1 MB upload limit
+MAX_UPLOAD_ROWS = 2_000  # Guard rail for extreme row counts
+
+# Amend limits based on passed attribute flags if running locally 
+def get_upload_limits() -> Tuple[int, int]:
+    """
+    Determine file upload limits based on CLI flags.
+    
+    Returns:
+        Tuple of (max_bytes, max_rows) reflecting overrides when requested.
+    """
+    max_bytes = MAX_UPLOAD_BYTES
+    max_rows = MAX_UPLOAD_ROWS
+    args = CLI_ARGS
+
+    if args is None:
+        return max_bytes, max_rows
+
+    local_mode = getattr(args, "local_mode", False)
+    custom_mb = getattr(args, "max_upload_mb", None)
+    custom_rows = getattr(args, "max_upload_rows", None)
+
+    if custom_mb is not None and custom_mb > 0:
+        max_bytes = int(custom_mb * 1024 * 1024)
+    elif local_mode:
+        max_bytes = 10 * 1024 * 1024  # 10 MB default for local mode
+
+    if custom_rows is not None and custom_rows > 0:
+        max_rows = custom_rows
+    elif local_mode:
+        max_rows = 20_000  # Higher default row limit for local mode
+
+    return max_bytes, max_rows
 
 # Mineral configuration for Fe3+ calculations
 MINERAL_CONFIG = pd.DataFrame([('Garnet', 'Garnet', 12, 8, 'yes', 0.014, 0.055)])
@@ -85,9 +163,6 @@ OXIDE_CONFIG = pd.DataFrame([
 
 # Required oxides for Fe3+ calculations
 REQUIRED_OXIDES = ['SiO2', 'Al2O3', 'MgO', 'CaO', 'FeO', 'MnO', 'TiO2', 'Cr2O3', 'Na2O']
-
-MAX_UPLOAD_BYTES = 1 * 1024 * 1024  # 1 MB upload limit
-MAX_UPLOAD_ROWS = 2_000  # Guard rail for extreme row counts
 
 
 def dataframe_signature(df: pd.DataFrame) -> str:
@@ -1072,19 +1147,22 @@ def run_app() -> None:
         st.markdown("---")
         st.markdown(
             """
-            <div style="font-size:0.75rem;color:#555;">
-                <p><small><strong>Data Privacy:</strong> If you are using this app via <a href="https://pyropt.streamlit.app">pyropt.streamlit.app</a>, note that uploaded .CSV files are processed on a <em>Streamlit Community Cloud</em> server. Your files/data are not saved or stored, and data transfered to this service is subject to strict and high standards. See <a href="https://docs.streamlit.io/deploy/streamlit-community-cloud/get-started/trust-and-security">Streamlit documentation</a> for more detail.
-                If you prefer to run this app on your own machine for greater data privacy, you can <a href="https://docs.streamlit.io/get-started/installation">install streamlit</a> on your computer, and download the code for this app from the <a href="https://github.com/PyroPT/PyroPT">PyroPT GitHub repository</a>.</small></p>
-                <p><small><strong>Attribution &amp; Acknowledgements:</strong> 
-                <p>Gary J. O'Sullivan<sup>1</sup>, Emma L. Tomlinson<sup>1</sup>, Dónal Mulligan<sup>2</sup>, Michele Rinaldi<sup>1</sup>, Oliver Higgins<sup>1,3</sup>, Phillip E. Janney<sup>4</sup>, Brendan C. Hoare<sup>5</sup></p>
+            <div style="font-size:1rem;color:#555;">
+                <small>
+                <p><strong>Something amiss?:</strong> If you encounter any errors or issues with this app, please contact <em>gjosulli@tcd.ie</em> with the subject line: <em>PyroPT Issue Report</em></p>
+                <p><strong>Data Privacy:</strong> If you are using this app via <a href="https://pyropt.streamlit.app">pyropt.streamlit.app</a>, note that uploaded .CSV files are processed on a <em>Streamlit Community Cloud</em> server. Your files/data are not saved or stored, and data transfered to this service is subject to strict and high standards. See <a href="https://docs.streamlit.io/deploy/streamlit-community-cloud/get-started/trust-and-security">Streamlit documentation</a> for more detail.
+                If you prefer to run this app on your own machine for greater data privacy, you can <a href="https://docs.streamlit.io/get-started/installation">install streamlit</a> on your computer, and download the code for this app from the <a href="https://github.com/PyroPT/PyroPT">PyroPT GitHub repository</a>.</p>
+                <p><strong>Attribution &amp; Acknowledgements:</strong> <br />
+                Gary J. O'Sullivan<sup>1</sup>, Emma L. Tomlinson<sup>1</sup>, Dónal Mulligan<sup>2</sup>, Michele Rinaldi<sup>1</sup>, Oliver Higgins<sup>1,3</sup>, Phillip E. Janney<sup>4</sup>, Brendan C. Hoare<sup>5</sup></p>
                 <p><small> <sup>1</sup> Department of Geology, <a href='http://www.tcd.ie'>Trinity College Dublin</a>, Ireland<br/>
                     <sup>2</sup> School of Communications, <a href='http://www.dcu.ie'>Dublin City University</a>, Ireland<br/>
                     <sup>3</sup> <a href='https://www.st-andrews.ac.uk'>University of St Andrews</a>, United Kingdom<br/>
                     <sup>4</sup> <a href='https://www.uct.ac.za'>University of Cape Town</a>, South Africa<br/>
                     <sup>5</sup> National High Magnetic Field Laboratory, <a href='https://www.fsu.edu'>Florida State University</a>, United States of America
                 </small></p>
-                <p>This tool was developed from a research project funded by the European Union (<a href='https://cordis.europa.eu/project/id/101044276'>ERC-CoG-2020 LITHO3</a>, 101044276 to ELT).</small></p>
-                <p><small>Views and opinions expressed are however those of the authors only and do not necessarily reflect those of the European Union or the European Research Council. Neither the European Union nor the granting authority can be held responsible for them.</small></p>
+                <p>This tool was developed from a research project funded by the European Union (<a href='https://cordis.europa.eu/project/id/101044276'>ERC-CoG-2020 LITHO3</a>, 101044276 to ELT).</p>
+                <p>Views and opinions expressed are however those of the authors only and do not necessarily reflect those of the European Union or the European Research Council. Neither the European Union nor the granting authority can be held responsible for them.</p>
+                </small>
             </div>
             """,
             unsafe_allow_html=True
@@ -1138,21 +1216,34 @@ def run_app() -> None:
         st.markdown("---")
         st.markdown(f":gray[PyroPT {PYROPT_VERSION}]")
 
+    max_upload_bytes, max_upload_rows = get_upload_limits()
+
     uploaded_file = st.file_uploader(
         "Upload a CSV file containing unknown garnet analyses", type="csv", accept_multiple_files=False
     )
 
     if not uploaded_file:
-        st.info('''Your **.CSV** file must have at least the following column headings (in any order):  
-        `Sample_ID`, `SiO2`, `TiO2`, `Al2O3`, `Cr2O3`, `MnO`, `MgO`, `FeO`, `CaO`, `Na2O`'''
-        '''\n\nEmpty values for cells are assumed to be zero, when your file is processed. Values for `Na2O` can always be empty, if no data. You can include additional columns in your file - *these are ignored and do not affect the models*.'''
-        '''\n\nA filesize limit of 1 MB applies. Your file is also limited to 2,000 rows.
-        ''')
+        limit_mb = max_upload_bytes / (1024 * 1024)
+        if max_upload_rows is None:
+            row_message = "There is no explicit row-count limit."
+        else:
+            row_message = f"Your file is also limited to {max_upload_rows:,} rows."
+        st.info(
+            f"Your **.CSV** file must have at least the following column headings (in any order):  \n"
+            "`Sample_ID`, `SiO2`, `TiO2`, `Al2O3`, `Cr2O3`, `MnO`, `MgO`, `FeO`, `CaO`, `Na2O`\n\n"
+            "Empty values for cells are assumed to be zero, when your file is processed. Values for `Na2O` can always be empty, if no data. "
+            "You can include additional columns in your file - *these are ignored and do not affect the models*.\n\n"
+            f"A filesize limit of {limit_mb:.1f} MB applies. {row_message}"
+        )
         render_footer()
         return
 
     try:
-        enforce_upload_limits(uploaded_file)
+        enforce_upload_limits(
+            uploaded_file,
+            max_bytes=max_upload_bytes,
+            max_rows=max_upload_rows
+        )
     except (UploadedFileTooLargeError, UploadedFileTooManyRowsError) as exc:
         st.error(str(exc))
         render_footer()
