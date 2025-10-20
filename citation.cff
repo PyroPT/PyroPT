@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "To reference your use of this software, please cite it as below."
-title: "PyroPT: Garnet Pressure–Temperature Predictor"
+title: "PyroPT: Garnet Pressure-Temperature Predictor"
 type: software
 authors:
   - family-names: "Mulligan"
@@ -15,3 +15,8 @@ url: "https://pyropt.streamlit.app/"
 date-released: "2025-10-20"
 license: "Apache-2.0"
 repository-code: "https://github.com/PyroPT/PyroPT"
+doi: https://doi.org/10.5281/zenodo.17400965
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.17400965
+    description: "General public release of PyroPT v1.0 Garnet Pressure-Temperature Predictor"
