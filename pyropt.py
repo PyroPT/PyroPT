@@ -68,7 +68,7 @@ warnings.filterwarnings('ignore')
 # =============================================================================
 
 # Version numbering, to track updates
-PYROPT_VERSION = "v1.0 2025"
+PYROPT_VERSION = "v1.0.1 2025"
 
 # Check flags to see if it's running locally, rather than on Streamlit Cloud
 def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -1145,11 +1145,19 @@ def run_app() -> None:
 
     def render_footer() -> None:
         st.markdown("---")
+        st.markdown("""
+            [![Version](https://img.shields.io/badge/GitHub-PyroPT%2FPyroPT-black.svg)](https://github.com/PyroPT/PyroPT)
+            [![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](https://opensource.org/license/apache-2-0)
+            [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+            [![Streamlit](https://img.shields.io/badge/streamlit-1.28%2B-red.svg)](https://streamlit.io/)
+            [![DOI](https://img.shields.io/badge/DOI-10.5281/zenodo.17400965-blue.svg)](https://doi.org/10.5281/zenodo.17400965)
+        """)
         st.markdown(
             """
             <div style="font-size:1rem;color:#555;">
                 <small>
-                <p><strong>Something amiss?:</strong> If you encounter any errors or issues with this app, please contact <em>gjosulli@tcd.ie</em> with the subject line: <em>PyroPT Issue Report</em></p>
+                <p><strong>Cite this tool:</strong> O'Sullivan, G., & Mulligan, D. (2025). <em>PyroPT - Garnet Pressure-Temperature Predictor</em> (v1.0). Zenodo. doi: 10.5281/zenodo.17400966</p>
+                <p><strong>Something amiss?</strong> If you encounter issues with this app, please contact <em>gjosulli@tcd.ie</em> with the subject line: <em>PyroPT Issue Report</em></p>
                 <p><strong>Data Privacy:</strong> If you are using this app via <a href="https://pyropt.streamlit.app">pyropt.streamlit.app</a>, note that uploaded .CSV files are processed on a <em>Streamlit Community Cloud</em> server. Your files/data are not saved or stored, and data transfered to this service is subject to strict and high standards. See <a href="https://docs.streamlit.io/deploy/streamlit-community-cloud/get-started/trust-and-security">Streamlit documentation</a> for more detail.
                 If you prefer to run this app on your own machine for greater data privacy, you can <a href="https://docs.streamlit.io/get-started/installation">install streamlit</a> on your computer, and download the code for this app from the <a href="https://github.com/PyroPT/PyroPT">PyroPT GitHub repository</a>.</p>
                 <p><strong>Attribution &amp; Acknowledgements:</strong> <br />

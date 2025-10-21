@@ -2,7 +2,7 @@
 # PyroPT
 
 [![Version](https://img.shields.io/badge/version-1.0-purple.svg)](https://github.com/PyroPT/PyroPT)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](https://opensource.org/license/apache-2-0)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/streamlit-1.28%2B-red.svg)](https://streamlit.io/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281/zenodo.17400965-blue.svg)](https://doi.org/10.5281/zenodo.17400965)
