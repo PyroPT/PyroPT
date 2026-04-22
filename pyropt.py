@@ -2,8 +2,8 @@
 """
 Machine Learning for Garnet Pressure-Temperature Prediction
 
-This module implements a KNN algorithm on a database of garnet compositions from 
-peridotite xenoliths in kimberlites and lamproites. It takes unknown input data 
+This module implements a KNN algorithm on a database of garnet compositions from
+peridotite xenoliths in kimberlites and lamproites. It takes unknown input data
 and yields predictions for pressure and temperature.
 
 The code includes:
@@ -11,7 +11,7 @@ The code includes:
 - Data preprocessing and filtering
 - KNN model training and evaluation
 - Unknown sample prediction
-- Visualization of results
+- Visualisation of results
 """
 
 import argparse
@@ -60,24 +60,21 @@ class DuplicateSampleIDError(Exception):
     pass
 
 
-# Suppress warnings for cleaner output
-warnings.filterwarnings('ignore')
-
 # =============================================================================
 # CONFIGURATION DATA
 # =============================================================================
 
 # Version numbering, to track updates
-PYROPT_VERSION = "v1.0.1 2025"
+PYROPT_VERSION = "v1.2.0 2026"
 
 # Check flags to see if it's running locally, rather than on Streamlit Cloud
 def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """
     Parse command line arguments for local execution.
-    
+
     Args:
         argv: Optional list of CLI arguments. When None, uses sys.argv[1:].
-        
+
     Returns:
         argparse.Namespace with recognised options. Unrecognised options are ignored
         so that Streamlit-specific flags do not cause parsing to fail.
@@ -111,15 +108,20 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 CLI_ARGS = parse_arguments()
 
+# Suppress warnings in cloud deployment for cleaner output
+# In local mode warnings are shown to aid compatibility monitoring
+if not getattr(CLI_ARGS, 'local_mode', False):
+    warnings.filterwarnings('ignore')
+
 # Default file size and csv row limits (for Streamlit Cloud)
 MAX_UPLOAD_BYTES = 1 * 1024 * 1024  # 1 MB upload limit
 MAX_UPLOAD_ROWS = 2_000  # Guard rail for extreme row counts
 
-# Amend limits based on passed attribute flags if running locally 
+# Amend limits based on passed attribute flags if running locally
 def get_upload_limits() -> Tuple[int, int]:
     """
     Determine file upload limits based on CLI flags.
-    
+
     Returns:
         Tuple of (max_bytes, max_rows) reflecting overrides when requested.
     """
@@ -153,11 +155,11 @@ MINERAL_CONFIG = MINERAL_CONFIG.sort_values('Mineral').reset_index(drop=True)
 
 # Oxide configuration for conversions
 OXIDE_CONFIG = pd.DataFrame([
-    ('SiO2', 60.08, 2, 1, 4), ('TiAll', 79.87, 2, 1, 4), ('TiO2', 79.87, 2, 1, 4), 
-    ('Al2O3', 101.96, 3, 2, 3), ('Cr2O3', 151.99, 3, 2, 3), ('FeO', 71.84, 1, 1, 2), 
-    ('Fe2O3', 159.69, 3, 2, 3), ('MnO', 70.94, 1, 1, 2), ('MgO', 40.30, 1, 1, 2), 
-    ('NiO', 74.69, 1, 1, 2), ('CaO', 56.08, 1, 1, 2), ('Na2O', 61.98, 1, 2, 1), 
-    ('K2O', 94.20, 1, 2, 1), ('H2O', 18.01, 1, 2, 1), ('P2O5', 283.89, 5, 2, 5), 
+    ('SiO2', 60.08, 2, 1, 4), ('TiAll', 79.87, 2, 1, 4), ('TiO2', 79.87, 2, 1, 4),
+    ('Al2O3', 101.96, 3, 2, 3), ('Cr2O3', 151.99, 3, 2, 3), ('FeO', 71.84, 1, 1, 2),
+    ('Fe2O3', 159.69, 3, 2, 3), ('MnO', 70.94, 1, 1, 2), ('MgO', 40.30, 1, 1, 2),
+    ('NiO', 74.69, 1, 1, 2), ('CaO', 56.08, 1, 1, 2), ('Na2O', 61.98, 1, 2, 1),
+    ('K2O', 94.20, 1, 2, 1), ('H2O', 18.01, 1, 2, 1), ('P2O5', 283.89, 5, 2, 5),
     ('V2O3', 149.88, 3, 2, 3), ('SrO', 103.62, 1, 2, 2), ('CoO', 74.93, 1, 2, 2),
 ], columns=['Oxide', 'MolecularWeight', 'Oxygens', 'Cations', 'CationCharge'])
 
@@ -168,10 +170,10 @@ REQUIRED_OXIDES = ['SiO2', 'Al2O3', 'MgO', 'CaO', 'FeO', 'MnO', 'TiO2', 'Cr2O3',
 def dataframe_signature(df: pd.DataFrame) -> str:
     """
     Generate a stable signature for a DataFrame irrespective of column order.
-    
+
     Args:
         df: DataFrame to hash
-        
+
     Returns:
         Hex digest representing the DataFrame contents
     """
@@ -181,12 +183,12 @@ def dataframe_signature(df: pd.DataFrame) -> str:
 
 # Model parameters
 DEFAULT_N_NEIGHBORS = 12
-DEFAULT_RANDOM_STATE_P = 286
-DEFAULT_RANDOM_STATE_T = 154
+DEFAULT_RANDOM_STATE_P = 141
+DEFAULT_RANDOM_STATE_T = 247
 
 # Feature sets for P and T prediction
-FEATURES_P = ['Al2O3', 'TiO2', 'CaO', 'MgO']
-FEATURES_T = ['MnO', 'TiO2', 'MgO', 'CaO']
+FEATURES_P = ['Al2O3', 'Cr2O3', 'TiO2', 'MgO', 'CaO', 'SiO2']
+FEATURES_T = ['MnO', 'FeO', 'TiO2', 'MgO', 'CaO', 'SiO2']
 
 # Data paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -198,7 +200,7 @@ EXCLUDED_GARNET_TYPES = ['G1', 'G3', 'G4', 'G5', 'G12', 'Exp']
 # Plotting configuration
 GARNET_COLOR_MAP = {
     'G10': 'blue',
-    'G9': 'green', 
+    'G9': 'green',
     'G11': 'orange',
     'Cpx': 'black'
 }
@@ -220,10 +222,10 @@ FIT_GEOTHERM = True
 def convert_weight_to_moles(df: pd.DataFrame) -> pd.DataFrame:
     """
     Convert oxide weight percentages to moles.
-    
+
     Args:
         df: DataFrame with oxide columns
-        
+
     Returns:
         DataFrame with oxide values converted to moles
     """
@@ -237,29 +239,29 @@ def convert_weight_to_moles(df: pd.DataFrame) -> pd.DataFrame:
 
 def convert_moles_to_elements(df: pd.DataFrame, mineral: str) -> pd.DataFrame:
     """
-    Convert moles to elements and normalize to mineral stoichiometry.
-    
+    Convert moles to elements and normalise to mineral stoichiometry.
+
     Args:
         df: DataFrame with oxide data in moles
-        mineral: Mineral type for normalization
-        
+        mineral: Mineral type for normalisation
+
     Returns:
-        DataFrame with element data normalized to mineral stoichiometry
+        DataFrame with element data normalised to mineral stoichiometry
     """
     elements = df.columns
-    
+
     # Step 1: Calculate oxygen number of moles
     for element in elements:
         if element in OXIDE_CONFIG['Oxide'].values:
             ox_number = OXIDE_CONFIG.loc[OXIDE_CONFIG['Oxide'] == element, 'Oxygens'].iloc[0]
             df[element] = df[element].mul(ox_number).round(4)
-    
-    # Step 2: Normalize to required number of oxygens
+
+    # Step 2: Normalise to required number of oxygens
     mineral_clean = mineral.replace('/', '').replace('.xls', '')
     ox_to_norm = MINERAL_CONFIG.loc[MINERAL_CONFIG['Mineral'] == mineral_clean, 'Oxygens'].iloc[0]
     df = df.div(df.sum(axis=1), axis=0)
     df = df.mul(ox_to_norm, axis=0)
-    
+
     # Step 3: Calculate number of cations
     for element in elements:
         if element in OXIDE_CONFIG['Oxide'].values:
@@ -267,63 +269,63 @@ def convert_moles_to_elements(df: pd.DataFrame, mineral: str) -> pd.DataFrame:
             ox = OXIDE_CONFIG.loc[OXIDE_CONFIG['Oxide'] == element, 'Oxygens'].iloc[0]
             ratio = cat / ox
             df[element] = df[element].mul(ratio).round(4)
-    
+
     return df.fillna(0)
 
 
-def calculate_fe3_droop1987(df: pd.DataFrame, mineral: str, sum_charge: float, 
+def calculate_fe3_droop1987(df: pd.DataFrame, mineral: str, sum_charge: float,
                            min_fe3: float, max_fe3: float) -> pd.DataFrame:
     """
     Calculate Fe3+ using the Droop (1987) approach.
-    
+
     Args:
         df: DataFrame with element data
         mineral: Mineral type
         sum_charge: Sum of cation charges
         min_fe3: Minimum Fe3+ value
         max_fe3: Maximum Fe3+ value
-        
+
     Returns:
         DataFrame with Fe3+ calculated
     """
     cat_number_t = MINERAL_CONFIG.loc[MINERAL_CONFIG['Mineral'] == mineral, 'Cations'].iloc[0]
     ox_number_norm = MINERAL_CONFIG.loc[MINERAL_CONFIG['Mineral'] == mineral, 'Oxygens'].iloc[0]
     a = cat_number_t / sum_charge
-    
+
     # Calculate Fe3+
     iron3 = 2 * ox_number_norm * (1 - a)
-    
-    # Normalize formula to T cations
+
+    # Normalise formula to T cations
     df = df.mul(a)
-    
+
     # Calculate total iron and check bounds
     total_iron = df['FeO']
-    
+
     # Apply min/max constraints
     iron3 = max(min_fe3, min(iron3, max_fe3))
-    
+
     # Recalculate Fe2+ and Fe3+
     check_df = total_iron - iron3
     check = float(check_df.iloc[0])
-    
+
     if check < 0:
         df['Fe2O3'] = total_iron
         df['FeO'] = 0
     else:
         df['Fe2O3'] = iron3
         df['FeO'] = total_iron - iron3
-    
+
     return df
 
 
 def convert_elements_to_weight(df_elements: pd.DataFrame, df_weight: pd.DataFrame) -> pd.DataFrame:
     """
     Convert element data back to weight percentages.
-    
+
     Args:
         df_elements: DataFrame with element data
         df_weight: Original weight percentage DataFrame
-        
+
     Returns:
         DataFrame with Fe2O3 and FeO recalculated in weight percentages
     """
@@ -337,37 +339,37 @@ def convert_elements_to_weight(df_elements: pd.DataFrame, df_weight: pd.DataFram
 def recalculate_fe3_droop(df: pd.Series) -> pd.Series:
     """
     Main function to calculate Fe2O3 in garnet using the Droop (1987) method.
-    
+
     Args:
         df: Series containing garnet composition data
-        
+
     Returns:
         Series with Fe3+ calculated and added
     """
     mineral = df.get('Mineral', 'Garnet')
-    
+
     # Extract oxide data by name to remain agnostic to column order
     missing_oxides = [oxide for oxide in REQUIRED_OXIDES if oxide not in df.index]
     if missing_oxides:
         raise MissingRequiredColumnsError(
             f"Your file is missing required columns: {', '.join(missing_oxides)}."
         )
-    
+
     ser_ox = df.loc[REQUIRED_OXIDES]
     df_ox = pd.DataFrame([ser_ox])
-    
+
     # Convert to moles and elements
     moles = convert_weight_to_moles(df_ox.copy())
     elements = convert_moles_to_elements(moles, mineral)
-    
+
     # Check if Droop 1987 is needed
-    sum_values = float(elements.sum(axis=1).round(5))
+    sum_values = float(elements.sum(axis=1).round(5).iloc[0])
     cat_number_t = float(MINERAL_CONFIG.loc[MINERAL_CONFIG['Mineral'] == mineral, 'Cations'].iloc[0])
-    
+
     # Get Fe3+ constraints
     min_fe3 = float(MINERAL_CONFIG.loc[MINERAL_CONFIG['Mineral'] == mineral, 'MinFe3'].iloc[0])
     max_fe3 = float(MINERAL_CONFIG.loc[MINERAL_CONFIG['Mineral'] == mineral, 'MaxFe3'].iloc[0])
-    
+
     if sum_values > cat_number_t:
         # Apply Droop 1987
         elements = calculate_fe3_droop1987(elements, mineral, sum_values, min_fe3, max_fe3)
@@ -375,16 +377,16 @@ def recalculate_fe3_droop(df: pd.Series) -> pd.Series:
         # Apply minimum Fe3+
         elements['Fe2O3'] = float(min_fe3)
         elements['FeO'] = elements['FeO'] - float(min_fe3)
-    
+
     # Convert back to oxides
     new_ox = convert_elements_to_weight(elements, df_ox)
-    
+
     # Update the original series with recalculated oxide values while preserving metadata
     updated = df.copy()
     ox_ser_new = new_ox.iloc[0]
     for column, value in ox_ser_new.items():
         updated[column] = value
-    
+
     return updated
 
 
@@ -392,25 +394,25 @@ def recalculate_fe3_droop(df: pd.Series) -> pd.Series:
 # DATA PREPARATION FUNCTIONS
 # =============================================================================
 
-def prepare_training_data(df: pd.DataFrame, target_variable: str, features: List[str], 
+def prepare_training_data(df: pd.DataFrame, target_variable: str, features: List[str],
                          exclude_garnets: List[str], random_state: int) -> Tuple:
     """
     Prepare training data by filtering and splitting.
-    
+
     Args:
         df: Input DataFrame
         target_variable: Target variable name ('P' or 'T')
         features: List of feature column names
         exclude_garnets: List of garnet types to exclude
         random_state: Random state for reproducibility
-        
+
     Returns:
         Tuple of (X_train, X_test, y_train, y_test, garnet_types_train, garnet_types_test)
     """
     # Filter out specified garnet types
-    df_filtered = df[~df['Garnet_type'].isin(exclude_garnets)]
+    df_filtered = df[~df['Garnet_type'].isin(exclude_garnets)].copy()
     df_filtered['Target'] = df_filtered[target_variable]
-    
+
     # Select top and bottom instances for each garnet type
     top_bottom_indices = []
     for garnet in df_filtered['Garnet_type'].unique():
@@ -420,33 +422,35 @@ def prepare_training_data(df: pd.DataFrame, target_variable: str, features: List
         bottom_indices = sorted_group.tail(12).index
         top_bottom_indices.extend(top_indices)
         top_bottom_indices.extend(bottom_indices)
-    
+
     # Separate selected instances
     df_top_bottom = df_filtered.loc[top_bottom_indices]
+    # Duplicate extreme samples to upweight them during training, reducing regression-to-the-mean at high and low P-T
+    df_top_bottom = pd.concat([df_top_bottom] * 2)
     df_remaining = df_filtered.drop(top_bottom_indices)
-    
+
     # Prepare remaining data
     X_remaining = df_remaining[features]
     y_remaining = df_remaining['Target']
     garnet_types_remaining = df_remaining['Garnet_type']
-    
+
     # Create stratified split
     num_bins = 5
     quantiles = np.linspace(0, 1, num_bins + 1)
     bins = np.quantile(y_remaining, quantiles)
     y_bin = pd.cut(y_remaining, bins=bins, include_lowest=True)
-    
+
     # Split the data
     X_train, X_test, y_train, y_test, garnet_types_train, garnet_types_test = train_test_split(
-        X_remaining, y_remaining, garnet_types_remaining, 
+        X_remaining, y_remaining, garnet_types_remaining,
         test_size=0.2, random_state=random_state, shuffle=True, stratify=y_bin
     )
-    
+
     # Add selected instances to training set
     X_train = pd.concat([X_train, df_top_bottom[features]], axis=0)
     y_train = pd.concat([y_train, df_top_bottom['Target']], axis=0)
     garnet_types_train = pd.concat([garnet_types_train, df_top_bottom['Garnet_type']], axis=0)
-    
+
     return X_train, X_test, y_train, y_test, garnet_types_train, garnet_types_test
 
 
@@ -454,12 +458,12 @@ def prepare_training_data(df: pd.DataFrame, target_variable: str, features: List
 # MODEL TRAINING FUNCTIONS
 # =============================================================================
 
-def train_and_evaluate_model(X_train: pd.DataFrame, X_test: pd.DataFrame, 
-                           y_train: pd.Series, y_test: pd.Series, 
+def train_and_evaluate_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
+                           y_train: pd.Series, y_test: pd.Series,
                            garnet_types_test: pd.Series, target_variable: str) -> Tuple:
     """
     Train and evaluate a KNN model.
-    
+
     Args:
         X_train: Training features
         X_test: Test features
@@ -467,7 +471,7 @@ def train_and_evaluate_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
         y_test: Test targets
         garnet_types_test: Test garnet types
         target_variable: Name of target variable
-        
+
     Returns:
         Tuple of (X_test, y_test, y_pred, scaler, knn_model)
     """
@@ -475,29 +479,30 @@ def train_and_evaluate_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
-    
+
     # Train KNN model
-    knn_model = KNeighborsRegressor(n_neighbors=DEFAULT_N_NEIGHBORS)
+    knn_model = KNeighborsRegressor(n_neighbors=DEFAULT_N_NEIGHBORS, weights='distance', p=1)
     knn_model.fit(X_train_scaled, y_train)
-    
+
     # Predict on test set
     y_pred = knn_model.predict(X_test_scaled)
-    
+
     # Calculate MAE
     mae = mean_absolute_error(y_test, y_pred)
     print(f"Mean Absolute Error for {target_variable} prediction: {mae:.2f}")
-    
+
     # Calculate MAE per garnet type
     X_test_copy = X_test.copy()
     X_test_copy['Predicted'] = y_pred
     X_test_copy['Actual'] = y_test.values
-    
+
     mae_per_garnet = X_test_copy.groupby(garnet_types_test).apply(
-        lambda group: mean_absolute_error(group['Actual'], group['Predicted'])
+        lambda group: mean_absolute_error(group['Actual'], group['Predicted']),
+        include_groups=False
     )
     print(f"\nMean Absolute Error per Garnet_Type:")
     print(mae_per_garnet)
-    
+
     return X_test, y_test, y_pred, scaler, knn_model
 
 
@@ -509,10 +514,10 @@ def train_and_evaluate_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
 def count_csv_data_rows(uploaded_file: IO[bytes]) -> int:
     """
     Count non-empty data rows in an uploaded CSV without loading into memory.
-    
+
     Args:
         uploaded_file: Streamlit UploadedFile or file-like object positioned at the start.
-        
+
     Returns:
         Number of non-empty data rows (excluding header).
     """
@@ -538,12 +543,12 @@ def enforce_upload_limits(uploaded_file: IO[bytes],
                           max_rows: int = MAX_UPLOAD_ROWS) -> None:
     """
     Ensure uploaded files fall within configured size and row limits.
-    
+
     Args:
         uploaded_file: Streamlit UploadedFile or file-like object.
         max_bytes: Maximum allowed file size in bytes.
         max_rows: Maximum allowed non-empty data rows.
-        
+
     Raises:
         UploadedFileTooLargeError: If the file exceeds size limits.
         UploadedFileTooManyRowsError: If the CSV exceeds row limits.
@@ -554,10 +559,10 @@ def enforce_upload_limits(uploaded_file: IO[bytes],
             "The uploaded file is too large. "
             f"Maximum allowed size is {max_bytes / (1024 * 1024):.1f} MB."
         )
-    
+
     if max_rows is None:
         return
-    
+
     data_rows = count_csv_data_rows(uploaded_file)
     if data_rows > max_rows:
         raise UploadedFileTooManyRowsError(
@@ -569,30 +574,30 @@ def enforce_upload_limits(uploaded_file: IO[bytes],
 def load_unknown_samples(file_source: Union[str, IO]) -> pd.DataFrame:
     """
     Load unknown samples from CSV file.
-    
+
     Args:
         file_source: Path to CSV file or file-like object
-        
+
     Returns:
         DataFrame with unknown samples
-    
+
     Raises:
         InvalidOxideValueError: If required oxide columns contain invalid values.
     """
     if hasattr(file_source, 'seek'):
         file_source.seek(0)
     df = pd.read_csv(file_source)
-    
+
     # Add 'Mineral' column if missing
     if 'Mineral' not in df.columns:
         df['Mineral'] = 'Garnet'
-    
+
     def _normalize_value(value: object) -> object:
         if isinstance(value, str):
             stripped = value.strip()
             return np.nan if stripped == '' else stripped
         return value
-    
+
     for oxide in REQUIRED_OXIDES:
         if oxide not in df.columns:
             continue
@@ -629,7 +634,7 @@ def load_unknown_samples(file_source: Union[str, IO]) -> pd.DataFrame:
                 f"Sample {sample_label} on line {line_number} contains a problem value for {oxide}."
             )
         df[oxide] = numeric_series
-    
+
     return df
 
 
@@ -641,11 +646,11 @@ def load_training_data(path: Union[str, Path] = TRAINING_DATA_PATH) -> pd.DataFr
 def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame) -> pd.DataFrame:
     """
     Preprocess unknown samples including Fe3+ calculation and validation.
-    
+
     Args:
         unknowns: DataFrame with unknown samples
         training_df: Training DataFrame for range validation
-        
+
     Returns:
         Preprocessed DataFrame with validation flags
     """
@@ -656,7 +661,7 @@ def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame
             f"{', '.join(sorted(REQUIRED_OXIDES))}. "
             f"Missing: {', '.join(missing_columns)}."
         )
-    
+
     if 'Sample_ID' not in unknowns.columns:
         raise MissingRequiredColumnsError(
             "Your file must include a `Sample_ID` column with unique values."
@@ -676,10 +681,10 @@ def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame
                 f"{duplicate_display} is duplicated."
             )
         )
-    
+
     old_unknowns = unknowns.copy()
     new_rows = []
-    
+
     # Process each sample
     for idx, row in old_unknowns.iterrows():
         if row['SiO2'] == 0.000001:
@@ -689,23 +694,23 @@ def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame
             # Calculate Fe3+
             new = recalculate_fe3_droop(row)
             new_rows.append(new)
-    
+
     # Create new DataFrame
     unknowns = pd.DataFrame(new_rows)
-    
+
     # Calculate totals
     oxides = ['SiO2', 'Al2O3', 'Cr2O3', 'TiO2', 'FeO', 'MnO', 'MgO', 'CaO', 'Na2O', 'Fe2O3']
     unknowns['Total'] = unknowns[oxides].sum(axis=1)
-    
+
     # Initialize validation
     unknowns['Valid'] = True
     unknowns['Validation_Failures'] = ''
-    
+
     # Check total range
     total_invalid = (unknowns['Total'] < 99) | (unknowns['Total'] > 102)
     unknowns.loc[total_invalid, 'Valid'] = False
     unknowns.loc[total_invalid, 'Validation_Failures'] += 'Total out of range; '
-    
+
     # Check feature ranges
     for feature in oxides:
         if feature in training_df.columns:
@@ -714,7 +719,7 @@ def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame
             out_of_range = (unknowns[feature] < min_val) | (unknowns[feature] > max_val)
             unknowns.loc[out_of_range, 'Valid'] = False
             unknowns.loc[out_of_range, 'Validation_Failures'] += f'{feature} out of range; '
-    
+
     # Calculate derived parameters
     unknowns['Ca_int'] = np.where(
         unknowns['CaO'] <= 3.375 + 0.25 * unknowns['Cr2O3'],
@@ -722,10 +727,10 @@ def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame
         unknowns['CaO'] - 0.25 * unknowns['Cr2O3']
     )
     unknowns['Mg#'] = (unknowns['MgO'] / 40.3) / ((unknowns['MgO'] / 40.3) + (unknowns['FeO'] / 71.85))
-    
+
     # Classify garnet types
     unknowns['Garnet_type'] = 'G0'  # Default
-    
+
     # Define classification conditions
     conditions = [
         # G1
@@ -763,33 +768,33 @@ def preprocess_unknown_samples(unknowns: pd.DataFrame, training_df: pd.DataFrame
          (0.17 <= unknowns['Mg#']) & (unknowns['Mg#'] <= 0.86) &
          (unknowns['TiO2'] < (2.13 - 2.1 * unknowns['Mg#'])) & (unknowns['TiO2'] < 2))
     ]
-    
+
     choices = ['G1', 'G11', 'G10', 'G9', 'G12', 'G5', 'G4', 'G3']
-    
+
     # Apply conditions
     assigned = np.zeros(len(unknowns), dtype=bool)
     for condition, choice in zip(conditions, choices):
         unassigned_condition = condition & ~assigned
         unknowns.loc[unassigned_condition, 'Garnet_type'] = choice
         assigned = assigned | unassigned_condition
-    
+
     # Mark invalid garnet types
     invalid_garnet_type = ~unknowns['Garnet_type'].isin(['G9', 'G10', 'G11'])
     unknowns.loc[invalid_garnet_type, 'Valid'] = False
     unknowns.loc[invalid_garnet_type, 'Validation_Failures'] += 'Invalid Garnet type; '
-    
+
     # Clean up validation failures
     unknowns['Validation_Failures'] = unknowns['Validation_Failures'].str.rstrip('; ')
-    
+
     return unknowns
 
 
 def predict_unknown_samples(unknowns: pd.DataFrame, model_type: str, training_df: pd.DataFrame,
-                          features_p: List[str], features_t: List[str], 
+                          features_p: List[str], features_t: List[str],
                           random_state: int, n_neighbors: int = DEFAULT_N_NEIGHBORS) -> pd.DataFrame:
     """
     Predict pressure or temperature for unknown samples.
-    
+
     Args:
         unknowns: DataFrame with unknown samples
         model_type: 'P' for pressure or 'T' for temperature
@@ -797,42 +802,42 @@ def predict_unknown_samples(unknowns: pd.DataFrame, model_type: str, training_df
         features_p: Features for pressure prediction
         features_t: Features for temperature prediction
         random_state: Random state for reproducibility
-        n_neighbors: Number of neighbors for KNN
-        
+        n_neighbors: Number of neighbours for KNN
+
     Returns:
-        DataFrame with predictions and neighbor information
+        DataFrame with predictions and neighbour information
     """
     # Preprocess unknowns
     unknowns = preprocess_unknown_samples(unknowns, training_df)
-    
+
     # Prepare training data
     target_variable = 'P' if model_type == 'P' else 'T'
     features = features_p if model_type == 'P' else features_t
-    
+
     X_train, X_test, y_train, y_test, garnet_types_train, garnet_types_test = prepare_training_data(
         training_df, target_variable, features, EXCLUDED_GARNET_TYPES, random_state
     )
-    
+
     # Fill missing values
     X_train = X_train.fillna(12)
     X_test = X_test.fillna(12)
-    
+
     # Train model
     _, _, _, scaler, knn_model = train_and_evaluate_model(
         X_train, X_test, y_train, y_test, garnet_types_test, target_variable
     )
-    
+
     # Prepare unknown samples for prediction
     X_unknowns = unknowns[features].copy()
     X_unknowns = X_unknowns.replace([np.inf, -np.inf], np.nan)
     X_unknowns = X_unknowns.fillna(0.000001)
     X_unknowns_scaled = scaler.transform(X_unknowns)
-    
+
     # Make predictions
     predictions = np.full(unknowns.shape[0], np.nan)
     neighbors = np.full((unknowns.shape[0], n_neighbors), np.nan)
     distances = np.full((unknowns.shape[0], n_neighbors), np.nan)
-    
+
     valid_unknowns = unknowns[unknowns['Valid']]
     if not valid_unknowns.empty:
         X_valid_unknowns_scaled = scaler.transform(valid_unknowns[features])
@@ -840,16 +845,16 @@ def predict_unknown_samples(unknowns: pd.DataFrame, model_type: str, training_df
         distances[unknowns['Valid']], neighbors[unknowns['Valid']] = knn_model.kneighbors(
             X_valid_unknowns_scaled, n_neighbors=n_neighbors, return_distance=True
         )
-    
+
     # Calculate average distances
     avg_distances = np.mean(distances, axis=1)
     predictions = np.round(predictions, 1)
-    
+
     # Prepare output
     output = unknowns.copy()
     output['Predicted_' + target_variable] = predictions
     output['Average_Distance'] = avg_distances
-    
+
     # Add neighbor information
     known_samples = X_train.copy()
     known_samples['Sample_ID'] = training_df.loc[known_samples.index, 'Sample_ID']
@@ -858,8 +863,18 @@ def predict_unknown_samples(unknowns: pd.DataFrame, model_type: str, training_df
     known_samples['Reference_Doi'] = training_df.loc[known_samples.index, 'Reference Doi']
     known_samples['Specific_Location'] = training_df.loc[known_samples.index, 'Specific Location']
     known_samples['Rocktype'] = training_df.loc[known_samples.index, 'Rocktype']
-    
-    # Add neighbor details
+
+    # Pre-initialise neighbour columns with correct dtypes to prevent pandas refusing
+    # to assign string values into columns it has inferred as float64 from early NaN fills
+    for j in range(1, n_neighbors + 1):
+        output[f'Neighbor_{j}_Sample_ID'] = None
+        output[f'Neighbor_{j}_Actual_{target_variable}'] = np.nan
+        output[f'Neighbor_{j}_Reference_Short'] = None
+        output[f'Neighbor_{j}_Reference_Doi'] = None
+        output[f'Neighbor_{j}_Specific_Location'] = None
+        output[f'Neighbor_{j}_Rocktype'] = None
+
+    # Add neighbour details
     for i, neighbor_indices in enumerate(neighbors):
         if not np.isnan(neighbor_indices[0]):
             for j, idx in enumerate(neighbor_indices, start=1):
@@ -870,15 +885,15 @@ def predict_unknown_samples(unknowns: pd.DataFrame, model_type: str, training_df
                     output.loc[unknowns.index[i], f'Neighbor_{j}_Reference_Doi'] = known_samples.iloc[int(idx)]['Reference_Doi']
                     output.loc[unknowns.index[i], f'Neighbor_{j}_Specific_Location'] = known_samples.iloc[int(idx)]['Specific_Location']
                     output.loc[unknowns.index[i], f'Neighbor_{j}_Rocktype'] = known_samples.iloc[int(idx)]['Rocktype']
-    
+
     # Round numerical columns
-    output = output.round({col: 3 for col in output.columns 
-                          if col not in ['Predicted_P', 'Predicted_T', 'Sample_ID', 'Garnet_type', 
+    output = output.round({col: 3 for col in output.columns
+                          if col not in ['Predicted_P', 'Predicted_T', 'Sample_ID', 'Garnet_type',
                                        'Valid', 'Validation_Failures', 'Average_Distance']})
-    
+
     if 'Fe2O3' not in output.columns and 'Fe2O3' in unknowns.columns:
         output['Fe2O3'] = unknowns['Fe2O3']
-    
+
     return output
 
 
@@ -890,6 +905,7 @@ def plot_pt_results(df: pd.DataFrame, pipe: Optional[str] = None,
                    anchor_weight: Optional[float] = None, include_cpx: bool = False,
                    include_g11: bool = INCLUDE_G11,
                    fit_geotherm: bool = FIT_GEOTHERM,
+                   show_error_bars: bool = True,
                    moho_temperature: float = MOHO_TEMPERATURE,
                    moho_pressure: float = MOHO_PRESSURE,
                    moho_uncertainty: float = MOHO_UNCERTAINTY,
@@ -897,7 +913,7 @@ def plot_pt_results(df: pd.DataFrame, pipe: Optional[str] = None,
                    ) -> Tuple[plt.Figure, Dict[str, Optional[float]], bytes]:
     """
     Create P-T plot with geotherm fitting.
-    
+
     Args:
         df: DataFrame with P-T predictions
         pipe: Optional pipe name to filter data
@@ -915,27 +931,27 @@ def plot_pt_results(df: pd.DataFrame, pipe: Optional[str] = None,
     def geotherm(z_km: float, q0: float, Ts: float = 273.0, k: float = 4.5, H: float = 1e-7) -> float:
         z_m = z_km * 1000
         return Ts + (q0 / k) * z_m - (H / (2 * k)) * z_m**2
-    
+
     def kbar_to_km(P_kbar: float) -> float:
         return P_kbar * 3.1
-    
+
     def km_to_kbar(km: float) -> float:
         return km / 3.1
-    
+
     def gd_transition_p_gpa(T_C: float) -> float:
         return 1.94 + 0.0025 * T_C
-    
+
     # Background geotherms
     pressure_kbar = np.linspace(0, 90, 500)
     depth_km = kbar_to_km(pressure_kbar)
     Tp = adiabat_temperature
     gamma = 0.3
     adiabat_T = Tp + gamma * pressure_kbar
-    
+
     heat_flows = [0.036, 0.040, 0.044, 0.048, 0.052]
     labels = ['36 mW/m²', '40 mW/m²', '44 mW/m²', '48 mW/m²', '52 mW/m²']
     colors = ['saddlebrown', 'darkred', 'red', 'orange', 'gold']
-    
+
     for q0, label_q, color_q in zip(heat_flows, labels, colors):
         T_K = geotherm(depth_km, q0)
         T_C = T_K - 273.15
@@ -947,9 +963,9 @@ def plot_pt_results(df: pd.DataFrame, pipe: Optional[str] = None,
         if start_idx <= end_idx:
             T_C_plot = T_C[start_idx:end_idx + 1]
             P_plot = pressure_kbar[start_idx:end_idx + 1]
-            plt.plot(T_C_plot, P_plot, color=color_q, label=label_q, 
+            plt.plot(T_C_plot, P_plot, color=color_q, label=label_q,
                     linewidth=1.5, alpha=0.6, zorder=1)
-    
+
     # Filter data
     if pipe:
         df_filtered = df[df['Pipe'] == pipe]
@@ -957,7 +973,7 @@ def plot_pt_results(df: pd.DataFrame, pipe: Optional[str] = None,
     else:
         df_filtered = df
         title = 'P vs T'
-    
+
     # Prepare defaults for LAB summary
     T_lab = None
     P_lab = None
@@ -1041,7 +1057,7 @@ def plot_pt_results(df: pd.DataFrame, pipe: Optional[str] = None,
                 zorder=0
             )
             plt.plot(T_line[mask_line], P_line[mask_line], 'k--', label='Fit Geotherm', zorder=2)
-    
+
     # Plot data points
     for garnet_type, color in GARNET_COLOR_MAP.items():
         if garnet_type == 'G11' and not include_g11:
@@ -1050,29 +1066,41 @@ def plot_pt_results(df: pd.DataFrame, pipe: Optional[str] = None,
             continue
         subset = df_filtered[df_filtered['Garnet_type'] == garnet_type]
         if garnet_type == 'Cpx':
-            plt.scatter(subset['Predicted_T'], subset['Predicted_P'], 
-                       edgecolors='black', facecolors='none', label='Cpx', 
+            plt.scatter(subset['Predicted_T'], subset['Predicted_P'],
+                       edgecolors='black', facecolors='none', label='Cpx',
                        alpha=0.8, zorder=3)
         else:
-            plt.scatter(subset['Predicted_T'], subset['Predicted_P'], 
+            plt.scatter(subset['Predicted_T'], subset['Predicted_P'],
                        color=color, label=garnet_type, alpha=0.7, zorder=3)
-    
+
+    # Representative error bar positioned dynamically in the upper right of the plot
+    if show_error_bars:
+        x_lo, x_hi = 400, 1600  # matches plt.xlim
+        y_lo, y_hi = 20, 70     # matches plt.ylim (y_lo is visual top after axis inversion)
+        err_T_pos = x_lo + 0.85 * (x_hi - x_lo)
+        err_P_pos = y_lo + 0.15 * (y_hi - y_lo)
+        plt.errorbar(err_T_pos, err_P_pos,
+                     xerr=115, yerr=7,
+                     fmt='o', color='black', ecolor='black',
+                     elinewidth=1.2, capsize=4, capthick=1.2,
+                     markersize=3, zorder=5, label='±1σ error')
+
     # Plot mantle adiabat
     T_adiabat = np.linspace(1000, 1600, 200)
     P_adiabat = 0.5 * (T_adiabat - adiabat_temperature) + moho_pressure
     plt.plot(T_adiabat, P_adiabat, 'r-.', label='Mantle adiabat', zorder=1.5)
-    
+
     # Plot LAB point
     if T_lab is not None:
         plt.annotate(f'LAB\n{P_lab:.1f} kbar\n{int(kbar_to_km(P_lab))} km',
                     xy=(T_lab, P_lab), xytext=(T_lab + 50, P_lab + 3),
                     arrowprops=dict(arrowstyle="->", lw=1.5), fontsize=10, zorder=4)
-    
+
     # Plot Garnet-Diamond transition
     T_line_gd = np.linspace(300, 1600, 200)
     P_GPa = gd_transition_p_gpa(T_line_gd)
     plt.plot(T_line_gd, P_GPa * 10, '-', color='purple', label='G–D transition', zorder=2)
-    
+
     # Final plot configuration
     plt.xlabel('Temperature (°C)')
     plt.ylabel('Pressure (kbar)')
@@ -1080,7 +1108,7 @@ def plot_pt_results(df: pd.DataFrame, pipe: Optional[str] = None,
     plt.xlim(400, 1600)
     plt.ylim(20, 70)
     plt.gca().invert_yaxis()
-    plt.legend(loc='lower left', fontsize='small', framealpha=0.8, ncol=1, 
+    plt.legend(loc='lower left', fontsize='small', framealpha=0.8, ncol=1,
               handlelength=1.5, borderaxespad=0.5)
     plt.tight_layout()
     fig = plt.gcf()
@@ -1153,10 +1181,10 @@ def run_app() -> None:
             [![DOI](https://img.shields.io/badge/DOI-10.5281/zenodo.17400965-blue.svg)](https://doi.org/10.5281/zenodo.17400965)
         """)
         st.markdown(
-            """
+            f"""
             <div style="font-size:1rem;color:#555;">
                 <small>
-                <p><strong>Cite this tool:</strong> O'Sullivan, G., & Mulligan, D. (2025). <em>PyroPT - Garnet Pressure-Temperature Predictor</em> (v1.0). Zenodo. doi: 10.5281/zenodo.17400966</p>
+                <p><strong>Cite this tool:</strong> O'Sullivan, G., & Mulligan, D. ({PYROPT_VERSION.split()[-1]}). <em>PyroPT - Garnet Pressure-Temperature Predictor</em> ({PYROPT_VERSION.split()[0]}). Zenodo. doi: 10.5281/zenodo.17400965</p>
                 <p><strong>Something amiss?</strong> If you encounter issues with this app, please contact <em>gjosulli@tcd.ie</em> with the subject line: <em>PyroPT Issue Report</em></p>
                 <p><strong>Data Privacy:</strong> If you are using this app via <a href="https://pyropt.streamlit.app">pyropt.streamlit.app</a>, note that uploaded .CSV files are processed on a <em>Streamlit Community Cloud</em> server. Your files/data are not saved or stored, and data transfered to this service is subject to strict and high standards. See <a href="https://docs.streamlit.io/deploy/streamlit-community-cloud/get-started/trust-and-security">Streamlit documentation</a> for more detail.
                 If you prefer to run this app on your own machine for greater data privacy, you can <a href="https://docs.streamlit.io/get-started/installation">install streamlit</a> on your computer, and download the code for this app from the <a href="https://github.com/PyroPT/PyroPT">PyroPT GitHub repository</a>.</p>
@@ -1190,25 +1218,30 @@ def run_app() -> None:
             value=FIT_GEOTHERM,
             help="Toggle fitting of the dashed geotherm line and LAB estimate"
         )
+        show_error_bars = st.checkbox(
+            "Show Error Bars",
+            value=True,
+            help="Show or hide the ±1σ error bars on the plot"
+        )
         moho_temperature = st.slider(
-            "Moho Temperature (°C)", 
-            min_value=400, 
-            max_value=700, 
-            value=int(MOHO_TEMPERATURE), 
+            "Moho Temperature (°C)",
+            min_value=400,
+            max_value=700,
+            value=int(MOHO_TEMPERATURE),
             step=10,
             help="Default value (480) is based on Moho Temperature range reported for Slave Craton, e.g. *Gruber et al. 2021*."
         )
         moho_pressure = st.slider(
-            "Moho Pressure (kbar)", 
-            min_value=5, 
-            max_value=20, 
-            value=int(MOHO_PRESSURE), 
+            "Moho Pressure (kbar)",
+            min_value=5,
+            max_value=20,
+            value=int(MOHO_PRESSURE),
             step=1,
             help="Default value (5) is based on a common cratonic average, see: *Youssof et al. 2013; Keller 2013*."
         )
         adiabat_temperature = st.slider(
             "Mantle Adiabat Temperature (°C)", min_value=1250, max_value=1500,
-            value=int(ADIABAT_TEMPERATURE), 
+            value=int(ADIABAT_TEMPERATURE),
             step=10,
             help="Default value (1300) is based on modern mantle potential temperature from *Katsura et al. 2010*."
         )
@@ -1394,6 +1427,7 @@ def run_app() -> None:
         anchor_weight=anchor_weight,
         include_g11=include_g11,
         fit_geotherm=fit_geotherm,
+        show_error_bars=show_error_bars,
         moho_temperature=float(moho_temperature),
         moho_pressure=float(moho_pressure),
         moho_uncertainty=float(moho_uncertainty),
